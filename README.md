@@ -73,6 +73,7 @@ MNEMONIC="..." COUNT=20 DRY_RUN=false ETH_RPC="https://你的主网RPC" OUT_FILE
 可选：
 - `CLAIM_VALUE_WEI`：强制 value（默认优先用接口返回，否则回退 0.0005 ETH）
 - `SLEEP_MS`：每个地址请求间隔
+- `DEBUG_DIR`：当抓不到 tx payload 时，保存原始接口响应（默认 `debug/`）
 
 > 注意：脚本会输出私钥到 CSV，请只在隔离环境使用，跑完立即清理文件。
 

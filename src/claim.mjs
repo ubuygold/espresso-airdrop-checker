@@ -92,17 +92,55 @@ function extractClaimTx(obj) {
   const candidates = []
   const seen = new Set()
 
+  function pickTo(node) {
+    return (
+      node.to ||
+      node.target ||
+      node.contract ||
+      node.contractAddress ||
+      node.txTo ||
+      node.destination ||
+      node.spender
+    )
+  }
+
+  function pickData(node) {
+    return (
+      node.data ||
+      node.calldata ||
+      node.callData ||
+      node.input ||
+      node.txData ||
+      node.encodedData ||
+      node.payload
+    )
+  }
+
+  function pickValue(node) {
+    return node.value ?? node.txValue ?? node.fee ?? node.nativeValue ?? node.ethValue
+  }
+
   function walk(node, path = '$') {
     if (!node || typeof node !== 'object') return
     if (seen.has(node)) return
     seen.add(node)
 
-    const to = node.to || node.target || node.contract || node.contractAddress
-    const data = node.data || node.calldata || node.callData || node.input
-    const value = node.value ?? node.txValue ?? node.fee
+    const to = pickTo(node)
+    const data = pickData(node)
+    const value = pickValue(node)
 
     if (looksLikeAddress(to) && looksLikeTxData(data)) {
       candidates.push({ to, data, value: toBigIntValue(value), path })
+    }
+
+    // some APIs return tx object split across sibling keys
+    if (node.tx && typeof node.tx === 'object') {
+      const txTo = pickTo(node.tx)
+      const txData = pickData(node.tx)
+      const txValue = pickValue(node.tx)
+      if (looksLikeAddress(txTo) && looksLikeTxData(txData)) {
+        candidates.push({ to: txTo, data: txData, value: toBigIntValue(txValue), path: `${path}.tx` })
+      }
     }
 
     for (const [k, v] of Object.entries(node)) {
@@ -114,8 +152,25 @@ function extractClaimTx(obj) {
 
   const byWithdraw = candidates.find((c) => c.data.slice(0, 10).toLowerCase() === '0x8612372a')
   if (byWithdraw) return byWithdraw
-  if (candidates.length) return candidates[0]
-  return null
+
+  // prefer candidate with non-zero value and longer calldata
+  const ranked = [...candidates].sort((a, b) => {
+    const av = a.value > 0n ? 1 : 0
+    const bv = b.value > 0n ? 1 : 0
+    if (av !== bv) return bv - av
+    return (b.data?.length || 0) - (a.data?.length || 0)
+  })
+
+  return ranked[0] || null
+}
+
+async function saveDebugJson(address, payload, tag = 'accounts') {
+  const fs = await import('node:fs/promises')
+  const dir = process.env.DEBUG_DIR || 'debug'
+  await fs.mkdir(dir, { recursive: true })
+  const file = `${dir}/${tag}-${address.toLowerCase()}.json`
+  await fs.writeFile(file, JSON.stringify(payload, null, 2), 'utf8')
+  return file
 }
 
 async function prepareClaim(wallet, provider) {
@@ -130,7 +185,8 @@ async function prepareClaim(wallet, provider) {
   const accounts = await getAccounts(accessToken)
   const tx = extractClaimTx(accounts)
   if (!tx) {
-    throw new Error('No claim tx payload found in /submission/accounts response. Save response and inspect schema.')
+    const debugFile = await saveDebugJson(address, accounts, 'accounts')
+    throw new Error(`No claim tx payload found in /submission/accounts response. Saved: ${debugFile}`)
   }
 
   const claimValue = process.env.CLAIM_VALUE_WEI

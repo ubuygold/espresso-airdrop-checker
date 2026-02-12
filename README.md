@@ -50,6 +50,32 @@ SIGN_MESSAGE_TEMPLATE="Sign-in for Espresso\nAddress: {address}\nNonce: {nonce}"
 - `status`（`ok`/`fail`）
 - `error`
 
+## 自动领取脚本（claim）
+
+新增脚本：`src/claim.mjs`
+
+功能：
+- 助记词批量派生地址
+- 调用 Espresso/Magna 接口登录并抓取领取交易参数
+- 自动发送领取交易（默认 `DRY_RUN=true`，只预演不广播）
+- 输出 CSV：地址、私钥、发送状态、txHash
+
+### 先预演（推荐）
+```bash
+MNEMONIC="..." COUNT=20 DRY_RUN=true OUT_FILE=claim-results.csv node src/claim.mjs
+```
+
+### 真正发送（会广播交易）
+```bash
+MNEMONIC="..." COUNT=20 DRY_RUN=false ETH_RPC="https://你的主网RPC" OUT_FILE=claim-results.csv node src/claim.mjs
+```
+
+可选：
+- `CLAIM_VALUE_WEI`：强制 value（默认优先用接口返回，否则回退 0.0005 ETH）
+- `SLEEP_MS`：每个地址请求间隔
+
+> 注意：脚本会输出私钥到 CSV，请只在隔离环境使用，跑完立即清理文件。
+
 ## 交易分析（判断是否 Espresso 真实领取）
 
 新增脚本：`src/analyze-tx.mjs`

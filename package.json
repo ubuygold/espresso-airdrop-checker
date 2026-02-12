@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "check": "node src/check.mjs",
-    "analyze:tx": "node src/analyze-tx.mjs"
+    "analyze:tx": "node src/analyze-tx.mjs",
+    "claim": "node src/claim.mjs"
   },
   "dependencies": {
     "ethers": "^6.15.0"

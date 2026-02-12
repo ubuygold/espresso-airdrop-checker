@@ -73,6 +73,44 @@ function pickMessage(noncePayload, address) {
   return buildSiweMessage({ address, nonce: String(nonce), statement: process.env.SIWE_STATEMENT || 'Espresso' })
 }
 
+function inferEligibility(accounts) {
+  const flat = JSON.stringify(accounts).toLowerCase()
+
+  const positiveSignals = ['eligible', 'iseligible', 'canclaim', 'allocation', 'claimable', 'amount']
+  const negativeSignals = ['ineligible', 'not eligible', 'not_eligible', 'noteligible', 'not claimable', 'blocked']
+
+  const hasPositive = positiveSignals.some((s) => flat.includes(s))
+  const hasNegative = negativeSignals.some((s) => flat.includes(s))
+
+  if (hasNegative && !hasPositive) return false
+  if (hasPositive) return true
+  return null
+}
+
+function csvEscape(value) {
+  const s = String(value ?? '')
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replaceAll('"', '""')}"`
+  }
+  return s
+}
+
+function toCsv(rows) {
+  const header = ['index', 'address', 'privateKey', 'eligible', 'status', 'error']
+  const lines = [header.join(',')]
+  for (const row of rows) {
+    lines.push([
+      row.index,
+      row.address,
+      row.privateKey,
+      row.eligible,
+      row.status,
+      row.error || ''
+    ].map(csvEscape).join(','))
+  }
+  return lines.join('\n')
+}
+
 async function checkOne(wallet) {
   const address = wallet.address
   const noncePayload = await getNonce(address)
@@ -103,33 +141,52 @@ async function main() {
   if (!Number.isInteger(count) || count <= 0) throw new Error('COUNT must be a positive integer')
 
   const wallets = deriveWallets(mnemonic, count)
-  const results = []
+  const rows = []
 
   for (let i = 0; i < wallets.length; i++) {
     const w = wallets[i]
     process.stdout.write(`[${i + 1}/${wallets.length}] ${w.address} ... `)
     try {
       const out = await checkOne(w)
-      console.log('OK')
-      results.push({ index: i, address: w.address, ok: true, data: out.accounts })
+      const eligible = inferEligibility(out.accounts)
+      console.log(`OK (${eligible === true ? 'eligible' : eligible === false ? 'ineligible' : 'unknown'})`)
+      rows.push({
+        index: i,
+        address: w.address,
+        privateKey: w.privateKey,
+        eligible: eligible === null ? 'unknown' : String(eligible),
+        status: 'ok',
+        error: ''
+      })
     } catch (err) {
       console.log('FAIL')
-      results.push({ index: i, address: w.address, ok: false, error: String(err?.message || err) })
+      rows.push({
+        index: i,
+        address: w.address,
+        privateKey: w.privateKey,
+        eligible: 'unknown',
+        status: 'fail',
+        error: String(err?.message || err)
+      })
     }
 
     const sleepMs = Number(process.env.SLEEP_MS || 250)
     if (sleepMs > 0) await new Promise((r) => setTimeout(r, sleepMs))
   }
 
-  const outFile = process.env.OUT_FILE || 'espresso-results.json'
+  const outFile = process.env.OUT_FILE || 'espresso-results.csv'
   const fs = await import('node:fs/promises')
-  await fs.writeFile(outFile, JSON.stringify(results, null, 2), 'utf8')
+  await fs.writeFile(outFile, toCsv(rows), 'utf8')
 
-  const eligible = results.filter((x) => x.ok)
+  const eligibleCount = rows.filter((x) => x.eligible === 'true').length
+  const ineligibleCount = rows.filter((x) => x.eligible === 'false').length
+  const unknownCount = rows.filter((x) => x.eligible === 'unknown').length
+
   console.log('\n=== SUMMARY ===')
-  console.log(`checked: ${results.length}`)
-  console.log(`login+query success: ${eligible.length}`)
-  console.log(`failed: ${results.length - eligible.length}`)
+  console.log(`checked: ${rows.length}`)
+  console.log(`eligible: ${eligibleCount}`)
+  console.log(`ineligible: ${ineligibleCount}`)
+  console.log(`unknown: ${unknownCount}`)
   console.log(`saved: ${outFile}`)
 }
 

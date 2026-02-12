@@ -21,7 +21,7 @@ npm install
 MNEMONIC="your twelve words ..." \
 COUNT=20 \
 PLATFORM=EVM \
-OUT_FILE=espresso-results.json \
+OUT_FILE=espresso-results.csv \
 node src/check.mjs
 ```
 
@@ -42,11 +42,13 @@ SIGN_MESSAGE_TEMPLATE="Sign-in for Espresso\nAddress: {address}\nNonce: {nonce}"
 
 ## 结果说明
 
-输出文件中每项包含：
+默认输出 CSV（`espresso-results.csv`），列为：
 - `index`
 - `address`
-- `ok`（是否登录+查询成功）
-- `data`（接口返回）或 `error`
+- `privateKey`
+- `eligible`（`true`/`false`/`unknown`）
+- `status`（`ok`/`fail`）
+- `error`
 
 ## 已用接口（前端抓取）
 

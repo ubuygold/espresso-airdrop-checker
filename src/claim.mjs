@@ -183,10 +183,22 @@ async function prepareClaim(wallet, provider) {
   if (!accessToken) throw new Error('no accessToken returned')
 
   const accounts = await getAccounts(accessToken)
+
+  // schema often returns eligibility status first; tx payload appears only when claim is actually available
+  const eligibleList = Array.isArray(accounts?.accounts)
+    ? accounts.accounts.filter((x) => x?.type === 'WALLET' && x?.isEligible === true)
+    : []
+  const pohPassed = accounts?.pohPassed
+  const submitted = accounts?.submitted
+
   const tx = extractClaimTx(accounts)
   if (!tx) {
     const debugFile = await saveDebugJson(address, accounts, 'accounts')
-    throw new Error(`No claim tx payload found in /submission/accounts response. Saved: ${debugFile}`)
+    const hints = []
+    if (submitted === true) hints.push('submitted=true')
+    if (pohPassed === false) hints.push('pohPassed=false (need PoH/Authena first)')
+    hints.push(`eligibleWallets=${eligibleList.length}`)
+    throw new Error(`No claim tx payload in /submission/accounts. ${hints.join(', ')}. Saved: ${debugFile}`)
   }
 
   const claimValue = process.env.CLAIM_VALUE_WEI

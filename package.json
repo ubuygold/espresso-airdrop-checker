@@ -1,0 +1,12 @@
+{
+  "name": "espresso-airdrop-checker",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "node src/check.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0"
+  }
+}

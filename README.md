@@ -50,6 +50,27 @@ SIGN_MESSAGE_TEMPLATE="Sign-in for Espresso\nAddress: {address}\nNonce: {nonce}"
 - `status`（`ok`/`fail`）
 - `error`
 
+## 交易分析（判断是否 Espresso 真实领取）
+
+新增脚本：`src/analyze-tx.mjs`
+
+用途：
+- 输入一个 tx hash
+- 自动从 Ethereum RPC 拉取 tx + receipt
+- 检查是否符合 Espresso claim 典型特征：
+  - 链为 Ethereum mainnet
+  - 方法选择器为 `0x8612372a`（withdraw）
+  - `value` 为 `0.0005 ETH`
+  - 事件日志里存在 ESP token 转账
+
+运行：
+```bash
+TX_HASH=0x... OUT_FILE=tx-analysis.json node src/analyze-tx.mjs
+```
+
+可选：
+- `ETH_RPC`：自定义 RPC（默认 `https://ethereum-rpc.publicnode.com`）
+
 ## 已用接口（前端抓取）
 
 - `GET /auth/nonce?wallet={address}`

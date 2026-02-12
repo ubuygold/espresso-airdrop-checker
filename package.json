@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "node src/check.mjs"
+    "check": "node src/check.mjs",
+    "analyze:tx": "node src/analyze-tx.mjs"
   },
   "dependencies": {
     "ethers": "^6.15.0"
